@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import authRoutes from './routes/auth.routes';
+import documentRoutes from './routes/document.routes';
 
 dotenv.config();
 
@@ -23,6 +24,7 @@ mongoose.connect(MONGODB_URI)
   });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/documents', documentRoutes);
 
 app.get('/', (req: Request, res: Response) => {
   res.json({ message: 'AI Study Buddy backend is running' });
