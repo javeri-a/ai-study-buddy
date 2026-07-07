@@ -4,7 +4,8 @@ import DocumentModel from '../models/Document';
 import Chunk from '../models/chunk';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { splitIntoChunks } from '../utils/chunking';
-import { generateEmbedding } from '../utils/gemini';
+import { generateEmbedding, generateAnswer } from '../utils/gemini';
+import { cosineSimilarity } from '../utils/similarity';
 
 export const uploadDocument = async (req: AuthRequest, res: Response) => {
   try {
@@ -20,7 +21,6 @@ export const uploadDocument = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ message: 'Could not extract text from this PDF' });
     }
 
-    // Document create karo, status "processing" ke sath
     const newDocument = await DocumentModel.create({
       userId: req.userId,
       title: req.file.originalname.replace('.pdf', ''),
@@ -29,10 +29,8 @@ export const uploadDocument = async (req: AuthRequest, res: Response) => {
       status: 'processing',
     });
 
-    // Text ko chunks mein todo
     const textChunks = splitIntoChunks(extractedText, 500);
 
-    // Har chunk ki embedding banao aur database mein save karo
     for (let i = 0; i < textChunks.length; i++) {
       const embedding = await generateEmbedding(textChunks[i]);
 
@@ -44,7 +42,6 @@ export const uploadDocument = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    // Ab document ka status "ready" kar do
     newDocument.status = 'ready';
     await newDocument.save();
 
@@ -61,5 +58,49 @@ export const uploadDocument = async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error('Upload error:', error);
     res.status(500).json({ message: 'Server error during upload' });
+  }
+};
+
+export const chatWithDocument = async (req: AuthRequest, res: Response) => {
+  try {
+    const { documentId } = req.params;
+    const { question } = req.body;
+
+    if (!question) {
+      return res.status(400).json({ message: 'Question is required' });
+    }
+
+    const document = await DocumentModel.findOne({ _id: documentId, userId: req.userId });
+    if (!document) {
+      return res.status(404).json({ message: 'Document not found' });
+    }
+
+    const questionEmbedding = await generateEmbedding(question);
+
+    const chunks = await Chunk.find({ documentId });
+
+    if (chunks.length === 0) {
+      return res.status(400).json({ message: 'No content found for this document' });
+    }
+
+    const scoredChunks = chunks.map((chunk) => ({
+      text: chunk.text,
+      score: cosineSimilarity(questionEmbedding, chunk.embedding),
+    }));
+
+    scoredChunks.sort((a, b) => b.score - a.score);
+    const topChunks = scoredChunks.slice(0, 3);
+
+    const context = topChunks.map((c) => c.text).join('\n\n');
+
+    const answer = await generateAnswer(question, context);
+
+    res.status(200).json({
+      answer,
+      question,
+    });
+  } catch (error) {
+    console.error('Chat error:', error);
+    res.status(500).json({ message: 'Server error during chat' });
   }
 };
