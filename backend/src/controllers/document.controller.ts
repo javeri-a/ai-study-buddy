@@ -21,10 +21,12 @@ export const uploadDocument = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ message: 'Could not extract text from this PDF' });
     }
 
+    const fixedFileName = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+
     const newDocument = await DocumentModel.create({
       userId: req.userId,
-      title: req.file.originalname.replace('.pdf', ''),
-      originalFileName: req.file.originalname,
+      title: fixedFileName.replace('.pdf', ''),
+      originalFileName: fixedFileName,
       extractedText,
       status: 'processing',
     });
@@ -102,5 +104,46 @@ export const chatWithDocument = async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error('Chat error:', error);
     res.status(500).json({ message: 'Server error during chat' });
+  }
+};
+
+export const getDocuments = async (req: AuthRequest, res: Response) => {
+  try {
+    const documents = await DocumentModel.find({ userId: req.userId }).sort({ createdAt: -1 });
+
+    res.status(200).json({
+      documents: documents.map((doc) => ({
+        id: doc._id,
+        title: doc.title,
+        status: doc.status,
+        createdAt: doc.createdAt,
+      })),
+    });
+  } catch (error) {
+    console.error('Get documents error:', error);
+    res.status(500).json({ message: 'Server error fetching documents' });
+  }
+};
+
+export const getDocumentById = async (req: AuthRequest, res: Response) => {
+  try {
+    const { documentId } = req.params;
+    const document = await DocumentModel.findOne({ _id: documentId, userId: req.userId });
+
+    if (!document) {
+      return res.status(404).json({ message: 'Document not found' });
+    }
+
+    res.status(200).json({
+      document: {
+        id: document._id,
+        title: document.title,
+        status: document.status,
+        createdAt: document.createdAt,
+      },
+    });
+  } catch (error) {
+    console.error('Get document error:', error);
+    res.status(500).json({ message: 'Server error fetching document' });
   }
 };
