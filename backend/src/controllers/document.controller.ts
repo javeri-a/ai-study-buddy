@@ -2,9 +2,10 @@ import { Response } from 'express';
 import { PDFParse } from 'pdf-parse';
 import DocumentModel from '../models/Document';
 import Chunk from '../models/chunk';
+import Quiz from '../models/Quiz';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { splitIntoChunks } from '../utils/chunking';
-import { generateEmbedding, generateAnswer } from '../utils/gemini';
+import { generateEmbedding, generateAnswer, generateQuiz } from '../utils/gemini';
 import { cosineSimilarity } from '../utils/similarity';
 
 export const uploadDocument = async (req: AuthRequest, res: Response) => {
@@ -145,5 +146,35 @@ export const getDocumentById = async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error('Get document error:', error);
     res.status(500).json({ message: 'Server error fetching document' });
+  }
+};
+
+export const createQuiz = async (req: AuthRequest, res: Response) => {
+  try {
+    const { documentId } = req.params;
+
+    const document = await DocumentModel.findOne({ _id: documentId, userId: req.userId });
+    if (!document) {
+      return res.status(404).json({ message: 'Document not found' });
+    }
+
+    const questions = await generateQuiz(document.extractedText);
+
+    const newQuiz = new Quiz({
+      documentId,
+      questions,
+    });
+    await newQuiz.save();
+
+    res.status(201).json({
+      message: 'Quiz generated successfully',
+      quiz: {
+        id: newQuiz._id,
+        questions: newQuiz.questions,
+      },
+    });
+  } catch (error) {
+    console.error('Quiz generation error:', error);
+    res.status(500).json({ message: 'Server error generating quiz' });
   }
 };
