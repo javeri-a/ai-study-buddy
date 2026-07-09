@@ -96,10 +96,11 @@ export const chatWithDocument = async (req: AuthRequest, res: Response) => {
 
     const context = topChunks.map((c) => c.text).join('\n\n');
 
-    const answer = await generateAnswer(question, context);
+    const result = await generateAnswer(question, context);
 
     res.status(200).json({
-      answer,
+      answer: result.answer,
+      topic: result.topic,
       question,
     });
   } catch (error) {
@@ -152,13 +153,14 @@ export const getDocumentById = async (req: AuthRequest, res: Response) => {
 export const createQuiz = async (req: AuthRequest, res: Response) => {
   try {
     const { documentId } = req.params;
+    const { topic } = req.body;
 
     const document = await DocumentModel.findOne({ _id: documentId, userId: req.userId });
     if (!document) {
       return res.status(404).json({ message: 'Document not found' });
     }
 
-    const questions = await generateQuiz(document.extractedText);
+    const questions = await generateQuiz(document.extractedText, topic);
 
     const newQuiz = new Quiz({
       documentId,
