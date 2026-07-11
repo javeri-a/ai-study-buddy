@@ -1,11 +1,12 @@
 import mongoose, { Schema, Document as MongooseDocument } from 'mongoose';
 
-export interface IDocument extends MongooseDocument {
+export interface IDocument extends Document {
   userId: mongoose.Types.ObjectId;
   title: string;
   originalFileName: string;
   extractedText: string;
   status: 'processing' | 'ready' | 'failed';
+  isFavorite: boolean;
   createdAt: Date;
 }
 
@@ -31,6 +32,10 @@ const documentSchema = new Schema<IDocument>({
     type: String,
     enum: ['processing', 'ready', 'failed'],
     default: 'processing',
+  },
+  isFavorite: {
+    type: Boolean,
+    default: false,
   },
   createdAt: {
     type: Date,

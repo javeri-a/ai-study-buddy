@@ -118,6 +118,7 @@ export const getDocuments = async (req: AuthRequest, res: Response) => {
         id: doc._id,
         title: doc.title,
         status: doc.status,
+        isFavorite: doc.isFavorite,
         createdAt: doc.createdAt,
       })),
     });
@@ -141,6 +142,7 @@ export const getDocumentById = async (req: AuthRequest, res: Response) => {
         id: document._id,
         title: document.title,
         status: document.status,
+        isFavorite: document.isFavorite,
         createdAt: document.createdAt,
       },
     });
@@ -197,5 +199,27 @@ export const deleteDocument = async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error('Delete document error:', error);
     res.status(500).json({ message: 'Server error deleting document' });
+  }
+};
+
+export const toggleFavorite = async (req: AuthRequest, res: Response) => {
+  try {
+    const { documentId } = req.params;
+
+    const document = await DocumentModel.findOne({ _id: documentId, userId: req.userId });
+    if (!document) {
+      return res.status(404).json({ message: 'Document not found' });
+    }
+
+    document.isFavorite = !document.isFavorite;
+    await document.save();
+
+    res.status(200).json({
+      message: 'Favorite status updated',
+      isFavorite: document.isFavorite,
+    });
+  } catch (error) {
+    console.error('Toggle favorite error:', error);
+    res.status(500).json({ message: 'Server error updating favorite' });
   }
 };
