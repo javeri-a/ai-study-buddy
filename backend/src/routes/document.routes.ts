@@ -1,21 +1,7 @@
-// import express from 'express';
-// import { protect } from '../middleware/auth.middleware';
-// import upload from '../config/multer';
-// import { uploadDocument, chatWithDocument, getDocuments, getDocumentById } from '../controllers/document.controller';
-
-// const router = express.Router();
-
-// router.get('/', protect, getDocuments);
-// router.get('/:documentId', protect, getDocumentById);
-// router.post('/upload', protect, upload.single('file'), uploadDocument);
-// router.post('/:documentId/chat', protect, chatWithDocument);
-
-// export default router;
-
 import express from 'express';
 import { protect } from '../middleware/auth.middleware';
 import upload from '../config/multer';
-import { uploadDocument, chatWithDocument, getDocuments, getDocumentById, createQuiz } from '../controllers/document.controller';
+import { uploadDocument, chatWithDocument, getDocuments, getDocumentById, createQuiz, deleteDocument } from '../controllers/document.controller';
 
 const router = express.Router();
 
@@ -24,5 +10,6 @@ router.get('/:documentId', protect, getDocumentById);
 router.post('/upload', protect, upload.single('file'), uploadDocument);
 router.post('/:documentId/chat', protect, chatWithDocument);
 router.post('/:documentId/quiz', protect, createQuiz);
+router.delete('/:documentId', protect, deleteDocument);
 
 export default router;

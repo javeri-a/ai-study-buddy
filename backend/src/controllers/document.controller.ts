@@ -180,3 +180,22 @@ export const createQuiz = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ message: 'Server error generating quiz' });
   }
 };
+
+export const deleteDocument = async (req: AuthRequest, res: Response) => {
+  try {
+    const { documentId } = req.params;
+
+    const document = await DocumentModel.findOne({ _id: documentId, userId: req.userId });
+    if (!document) {
+      return res.status(404).json({ message: 'Document not found' });
+    }
+
+    await Chunk.deleteMany({ documentId });
+    await DocumentModel.deleteOne({ _id: documentId });
+
+    res.status(200).json({ message: 'Document deleted successfully' });
+  } catch (error) {
+    console.error('Delete document error:', error);
+    res.status(500).json({ message: 'Server error deleting document' });
+  }
+};
