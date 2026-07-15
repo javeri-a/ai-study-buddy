@@ -7,7 +7,7 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import { splitIntoChunks } from '../utils/chunking';
 import { generateEmbedding, generateAnswer, generateQuiz } from '../utils/gemini';
 import { cosineSimilarity } from '../utils/similarity';
-
+import Chat from '../models/Chat';
 export const uploadDocument = async (req: AuthRequest, res: Response) => {
   try {
     if (!req.file) {
@@ -64,6 +64,51 @@ export const uploadDocument = async (req: AuthRequest, res: Response) => {
   }
 };
 
+// export const chatWithDocument = async (req: AuthRequest, res: Response) => {
+//   try {
+//     const { documentId } = req.params;
+//     const { question } = req.body;
+
+//     if (!question) {
+//       return res.status(400).json({ message: 'Question is required' });
+//     }
+
+//     const document = await DocumentModel.findOne({ _id: documentId, userId: req.userId });
+//     if (!document) {
+//       return res.status(404).json({ message: 'Document not found' });
+//     }
+
+//     const questionEmbedding = await generateEmbedding(question);
+
+//     const chunks = await Chunk.find({ documentId });
+
+//     if (chunks.length === 0) {
+//       return res.status(400).json({ message: 'No content found for this document' });
+//     }
+
+//     const scoredChunks = chunks.map((chunk) => ({
+//       text: chunk.text,
+//       score: cosineSimilarity(questionEmbedding, chunk.embedding),
+//     }));
+
+//     scoredChunks.sort((a, b) => b.score - a.score);
+//     const topChunks = scoredChunks.slice(0, 3);
+
+//     const context = topChunks.map((c) => c.text).join('\n\n');
+
+//     const result = await generateAnswer(question, context);
+
+//     res.status(200).json({
+//       answer: result.answer,
+//       topic: result.topic,
+//       question,
+//     });
+//   } catch (error) {
+//     console.error('Chat error:', error);
+//     res.status(500).json({ message: 'Server error during chat' });
+//   }
+// };
+
 export const chatWithDocument = async (req: AuthRequest, res: Response) => {
   try {
     const { documentId } = req.params;
@@ -97,6 +142,15 @@ export const chatWithDocument = async (req: AuthRequest, res: Response) => {
     const context = topChunks.map((c) => c.text).join('\n\n');
 
     const result = await generateAnswer(question, context);
+
+    // Chat history mein save karo
+    let chat = await Chat.findOne({ documentId, userId: req.userId });
+    if (!chat) {
+      chat = new Chat({ documentId, userId: req.userId, messages: [] });
+    }
+    chat.messages.push({ role: 'user', content: question, createdAt: new Date() });
+    chat.messages.push({ role: 'assistant', content: result.answer, createdAt: new Date() });
+    await chat.save();
 
     res.status(200).json({
       answer: result.answer,
@@ -152,17 +206,29 @@ export const getDocumentById = async (req: AuthRequest, res: Response) => {
   }
 };
 
+// export const createQuiz = async (req: AuthRequest, res: Response) => {
+//   try {
+//     const { documentId } = req.params;
+//     const { topic } = req.body;
+
+//     const document = await DocumentModel.findOne({ _id: documentId, userId: req.userId });
+//     if (!document) {
+//       return res.status(404).json({ message: 'Document not found' });
+//     }
+
+//     const questions = await generateQuiz(document.extractedText, topic);
+
 export const createQuiz = async (req: AuthRequest, res: Response) => {
   try {
     const { documentId } = req.params;
-    const { topic } = req.body;
+    const { topic, difficulty } = req.body;
 
     const document = await DocumentModel.findOne({ _id: documentId, userId: req.userId });
     if (!document) {
       return res.status(404).json({ message: 'Document not found' });
     }
 
-    const questions = await generateQuiz(document.extractedText, topic);
+    const questions = await generateQuiz(document.extractedText, topic, difficulty);
 
     const newQuiz = new Quiz({
       documentId,
@@ -221,5 +287,21 @@ export const toggleFavorite = async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error('Toggle favorite error:', error);
     res.status(500).json({ message: 'Server error updating favorite' });
+  }
+};
+
+
+export const getChatHistory = async (req: AuthRequest, res: Response) => {
+  try {
+    const { documentId } = req.params;
+
+    const chat = await Chat.findOne({ documentId, userId: req.userId });
+
+    res.status(200).json({
+      messages: chat ? chat.messages : [],
+    });
+  } catch (error) {
+    console.error('Get chat history error:', error);
+    res.status(500).json({ message: 'Server error fetching chat history' });
   }
 };
